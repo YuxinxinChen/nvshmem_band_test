@@ -3,6 +3,7 @@
 #include <cuda.h>
 
 #include <shmem.h>
+#include <shmemx.h>
 
 #include "time.cuh"
 
@@ -25,16 +26,16 @@ __global__ void full_band_warp(size_t size, int *remote_buffer, int *local_buffe
 {
   for(uint32_t i=TID; i<size; i+=blockDim.x*gridDim.x)
   {
-    uint32_t i = __shfl_sync(0xffffffff, i, 0);
+    i = __shfl_sync(0xffffffff, i, 0);
     __syncwarp();
-    shmemx_get_int_warp(local_buffer+i, remote_buffer+i, 32, remote_pe);
+    shmemx_int_get_warp(local_buffer+i, remote_buffer+i, 32, remote_pe);
   }
 }
 __global__ void full_band_block(size_t size, int *remote_buffer, int *local_buffer, int remote_pe)
 {
   for(uint32_t i=TID; i<size; i+=blockDim.x*gridDim.x)
   {
-    shmemx_get_int_block(local_buffer+blockIdx.x*blockDim.x, remote_buffer+blockIdx.x*blockDim.x, blockDim.x, remote_pe);
+    shmemx_int_get_block(local_buffer+blockIdx.x*blockDim.x, remote_buffer+blockIdx.x*blockDim.x, blockDim.x, remote_pe);
   }
 }
 
@@ -70,7 +71,7 @@ int main()
   for(int i=0; i<200; i++)
   {
     timer.Start();
-    char_band<<<320, 512>>>(size, remote_buffer, local_buffer, remote_pe);
+    full_band_block<<<320, 512>>>(size, remote_buffer, local_buffer, remote_pe);
     cudaDeviceSynchronize();
     timer.Stop();
     totaltime = totaltime + timer.ElapsedMillis();
