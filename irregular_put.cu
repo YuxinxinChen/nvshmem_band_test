@@ -16,8 +16,6 @@ __global__ void full_band(size_t size, int *remote_buffer, int *local_buffer, in
 {
   for(uint32_t i = TID; i<size; i+=blockDim.x*gridDim.x)
   {
-//    int item = shmem_int_g(remote_buffer+i, remote_pe);
-//    local_buffer[i] = item;
     shmem_int_put(remote_buffer+i, local_buffer+i, 1, remote_pe);
   }
 }
@@ -49,27 +47,37 @@ __global__ void char_band(size_t size, int *remote_buffer, int *local_buffer, in
 
 int main()
 {
-  size_t size = 1<<20;
+  size_t size = 1<<25;
   shmem_init();
   int my_pe = shmem_my_pe();
-  int n_pe = shmem_n_pes();
+  int n_pes = shmem_n_pes();
 
   int dev_count;
   cudaGetDeviceCount(&dev_count);
   cudaSetDevice(my_pe);
 
-  int * remote_buffer = (int *)shmem_malloc(sizeof(int)*size);
+  int * remote_buffer = (int *)shmem_malloc(sizeof(int)*size*2);
   int * local_buffer;
-  cudaMallocManaged(&local_buffer, sizeof(int)*size);
-  int remote_pe = my_pe^1;
+  cudaMallocManaged(&local_buffer, sizeof(int)*size*2);
 
   GpuTimer timer;
   float totaltime = 0.0;
+  int num_round = 200;
+  cudaStream_t *streams;
+  streams = (cudaStream_t *)malloc(sizeof(cudaStream_t)*(n_pes-1));
+  for(int i = 0; i<n_pes-1; i++ )
+      cudaStreamCreateWithFlags(streams+i, cudaStreamNonBlocking);
+  shmem_barrier_all();
 
-  for(int i=0; i<200; i++)
+  for(int i=0; i<num_round; i++)
   {
+    int remote_pe = (my_pe+1)%n_pes;
     timer.Start();
-    full_band_warp<<<320, 512>>>(size, remote_buffer, local_buffer, remote_pe);
+    for(int j=0; j<n_pes-1; j++)
+    {
+    full_band_block<<<80, 512, 0, streams[j]>>>(size, remote_buffer, local_buffer, remote_pe);
+    remote_pe = (remote_pe+1) % n_pes;
+    }
     cudaDeviceSynchronize();
     timer.Stop();
     totaltime = totaltime + timer.ElapsedMillis();
@@ -77,8 +85,8 @@ int main()
 
   shmem_barrier_all();
   shmem_finalize();
-  totaltime = totaltime/200;
-  std::cout <<"PE "<< my_pe <<  " average time: " <<  totaltime << " bandwithd: "<<(sizeof(int)*size/(totaltime/1000))/(1024*1024*1024)<<" GB/s" << std::endl;
+  totaltime = totaltime/num_round;
+  std::cout <<"PE "<< my_pe <<  " average time: " <<  totaltime << " bandwithd: "<<(sizeof(int)*size*(n_pes-1)/(totaltime/1000))/(1024*1024*1024)<<" GB/s" << std::endl;
   std::cout << "end of the program: "<< my_pe << std::endl;
   return 0;
 }
