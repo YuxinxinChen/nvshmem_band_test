@@ -1,19 +1,25 @@
-CUDA_HOME?=/usr/local/cuda
-SHMEM_HOME?=/home/yuxinc/yuxinchenPSG_Home/nvshmem_0.1.0+cuda9_x86_64
 
-CC=gcc
-CUDACC=${CUDA_HOME}/bin/nvcc
+# Makefile for some simple examples in this directory.
+# On bridges, you need to run `source prep.sh` to set
+# your environment before invoking this Makefile.
 
-CUDACFLAGS=-c -dc -gencode arch=compute_70,code=sm_70 -Xptxas="-v" --expt-extended-lambda --std=c++11 -I${SHMEM_HOME}/include
-LDFLAGS =-gencode=arch=compute_70,code=sm_70 -L$(SHMEM_HOME)/lib -lshmem -lcuda
+BCL_HOME=/home/yuxinc/yuxinchenPSG_Home/bcl
+NVSHMEM_HOME=/home/yuxinc/pkg/nvshmem_0.2.4-0+cuda10_x86_64
 
-OBJ=irregular_get.o 
+SOURCES += $(wildcard *.cu)
+TARGETS := $(patsubst %.cu, %, $(SOURCES))
 
-all: ${OBJ}
-	${CUDACC} -o irregular_get ${OBJ} ${LDFLAGS}
+CXX=nvcc
 
-%.o: %.cu
-	${CUDACC} ${CUDACFLAGS} $<
+# NVSHMEM_FLAGS=-DNVSHMEM_TARGET -gencode=arch=compute_35,code=sm_35 -gencode=arch=compute_37,code=sm_37 -gencode=arch=compute_52,code=sm_52 -gencode=arch=compute_60,code=sm_60 -gencode=arch=compute_61,code=sm_61 -gencode=arch=compute_70,code=sm_70 -ccbin g++  -I$(CUDA_HOME)/include/nvprefix -I$(NVSHMEM_HOME)/include/nvprefix -I$(MPI_HOME)/include -DENABLE_MPI_SUPPORT -rdc=true  -L$(NVSHMEM_HOME)/lib/nvprefix -lnvshmem -lcuda -L$(CUDA_HOME)/lib64 -lcudart -L$(MPI_HOME)/lib -lmpi -lopen-rte -lopen-pal -lm -lnuma -ldl -lrt -lutil
+NVSHMEM_FLAGS=-DNVSHMEM_TARGET -arch=sm_70 -ccbin g++  -I$(CUDA_HOME)/include/nvprefix -I$(NVSHMEM_HOME)/include/nvprefix -I$(MPI_HOME)/include -DENABLE_MPI_SUPPORT -rdc=true  -L$(NVSHMEM_HOME)/lib/nvprefix -lnvshmem -lcuda -L$(CUDA_HOME)/lib64 -lcudart -L$(MPI_HOME)/lib -lmpi -lopen-rte -lopen-pal -lm -lnuma -ldl -lrt -lutil
+
+CXXFLAGS = -std=c++11 -O3 -I$(BCL_HOME) --expt-extended-lambda $(NVSHMEM_FLAGS)
+
+all: $(TARGETS)
+
+%: %.cu
+	$(CXX) -o $@ $^ $(CXXFLAGS)
 
 clean:
-	rm -rf *.o irregular_get
+	rm -fv $(TARGETS)
