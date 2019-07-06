@@ -2,8 +2,8 @@
 
 #include <cuda.h>
 
-#include <shmem.h>
-#include <shmemx.h>
+#include <nvshmem.h>
+#include <nvshmemx.h>
 
 #include "time.cuh"
 
@@ -16,7 +16,7 @@ __global__ void full_band(size_t size, int *remote_buffer, int *local_buffer, in
 {
   for(uint32_t i = TID; i<size; i+=blockDim.x*gridDim.x)
   {
-    shmem_int_put(remote_buffer+i, local_buffer+i, 1, remote_pe);
+    nvshmem_int_put(remote_buffer+i, local_buffer+i, 1, remote_pe);
   }
 }
 __global__ void full_band_warp(size_t size, int *remote_buffer, int *local_buffer, int remote_pe)
@@ -25,21 +25,21 @@ __global__ void full_band_warp(size_t size, int *remote_buffer, int *local_buffe
   {
     i = __shfl_sync(0xffffffff, i, 0);
     __syncwarp();
-    shmemx_int_put_warp(remote_buffer+i, local_buffer+i, 32, remote_pe);
+    nvshmemx_int_put_warp(remote_buffer+i, local_buffer+i, 32, remote_pe);
   }
 }
 __global__ void full_band_block(size_t size, int *remote_buffer, int *local_buffer, int remote_pe)
 {
   for(uint32_t i=TID; i<size; i+=blockDim.x*gridDim.x)
   {
-    shmemx_int_put_block(remote_buffer+blockIdx.x*blockDim.x, local_buffer+blockIdx.x*blockDim.x, blockDim.x, remote_pe);
+    nvshmemx_int_put_block(remote_buffer+blockIdx.x*blockDim.x, local_buffer+blockIdx.x*blockDim.x, blockDim.x, remote_pe);
   }
 }
 __global__ void char_band(size_t size, int *remote_buffer, int *local_buffer, int remote_pe)
 {
   for(uint32_t i=TID; i<size; i+=blockDim.x*gridDim.x)
   {
-    shmem_putmem((void *)(remote_buffer+i), (void *)(local_buffer+i), sizeof(int), remote_pe);
+    nvshmem_putmem((void *)(remote_buffer+i), (void *)(local_buffer+i), sizeof(int), remote_pe);
   }
 }
 
@@ -48,15 +48,15 @@ __global__ void char_band(size_t size, int *remote_buffer, int *local_buffer, in
 int main()
 {
   size_t size = 1<<25;
-  shmem_init();
-  int my_pe = shmem_my_pe();
-  int n_pes = shmem_n_pes();
+  nvshmem_init();
+  int my_pe = nvshmem_my_pe();
+  int n_pes = nvshmem_n_pes();
 
   int dev_count;
   cudaGetDeviceCount(&dev_count);
   cudaSetDevice(my_pe);
 
-  int * remote_buffer = (int *)shmem_malloc(sizeof(int)*size*2);
+  int * remote_buffer = (int *)nvshmem_malloc(sizeof(int)*size*2);
   int * local_buffer;
   cudaMallocManaged(&local_buffer, sizeof(int)*size*2);
 
@@ -67,7 +67,7 @@ int main()
   streams = (cudaStream_t *)malloc(sizeof(cudaStream_t)*(n_pes-1));
   for(int i = 0; i<n_pes-1; i++ )
       cudaStreamCreateWithFlags(streams+i, cudaStreamNonBlocking);
-  shmem_barrier_all();
+  nvshmem_barrier_all();
 
   for(int i=0; i<num_round; i++)
   {
@@ -83,8 +83,8 @@ int main()
     totaltime = totaltime + timer.ElapsedMillis();
   }
 
-  shmem_barrier_all();
-  shmem_finalize();
+  nvshmem_barrier_all();
+  nvshmem_finalize();
   totaltime = totaltime/num_round;
   std::cout <<"PE "<< my_pe <<  " average time: " <<  totaltime << " bandwithd: "<<(sizeof(int)*size*(n_pes-1)/(totaltime/1000))/(1024*1024*1024)<<" GB/s" << std::endl;
   std::cout << "end of the program: "<< my_pe << std::endl;
