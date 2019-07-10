@@ -6,7 +6,8 @@
 BCL_HOME=/home/yuxinc/yuxinchenPSG_Home/bcl
 NVSHMEM_HOME=/home/yuxinc/pkg/nvshmem_0.2.4-0+cuda10_x86_64
 
-SOURCES += $(wildcard *.cu)
+#SOURCES += $(wildcard *.cu)
+SOURCES = irregular_get.cu irregular_put.cu coalesced_put.cu coalesced_get.cu
 TARGETS := $(patsubst %.cu, %, $(SOURCES))
 
 CXX=nvcc

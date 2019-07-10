@@ -90,7 +90,7 @@ int main()
 
   GpuTimer timer;
   float totaltime = 0.0;
-  int num_round = 100;
+  int num_round = 10;
 
   //------------------------------------------------------------------------------------------//
 
@@ -103,6 +103,7 @@ int main()
       int numBlock = 80;
       int numThread = 512;
       cudaMallocManaged(&local_buffer, message_size[i]*numBlock*numThread);
+      totaltime = 0.0;
       for(int j=0; j<num_round; j++)
       {
           nvshmem_barrier_all();
@@ -132,6 +133,7 @@ int main()
       int numBlock = 80;
       int numThread = 512;
       cudaMallocManaged(&local_buffer, message_size[i]*numBlock*numThread/32);
+      totaltime = 0.0;
       for(int j=0; j<num_round; j++)
       {
           nvshmem_barrier_all();
@@ -161,6 +163,7 @@ int main()
       int numBlock = 80;
       int numThread = 512;
       cudaMallocManaged(&local_buffer, message_size[i]*numBlock*numThread/32);
+      totaltime = 0.0;
       for(int j=0; j<num_round; j++)
       {
           nvshmem_barrier_all();

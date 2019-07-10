@@ -62,7 +62,7 @@ void int_block(size_t size, uint32_t num_messages, uint32_t message_size, uint32
 
 int main()
 {
-  size_t size = 1<<28;
+  size_t size = 1<<16;
   uint32_t num_messages = 1<<20; 
   uint32_t message_size[7] = {8,32, 128, 512, 2048, 8192, 32768}; //in bytes
   nvshmem_init();
@@ -97,14 +97,15 @@ int main()
   //------------------------------------------------------------------------------------------//
 
   if(my_pe == 0)
-      std::cout << "\nsending "<< num_messages << " to all PEs with various message size using API: nvshmem_int_get\n";
+      std::cout << "\nsending "<< num_messages << " to all PEs with various message size using API: nvshmem_int_put\n";
   nvshmem_barrier_all();
 
   for(int i=0; i<7; i++)
   {
       int numBlock = 80;
-      int numThread = 512;
+      int numThread = 1024;
       cudaMallocManaged(&local_buffer, message_size[i]*numBlock*numThread);
+      totaltime = 0.0;
       for(int j=0; j<num_round; j++)
       {
           nvshmem_barrier_all();
@@ -126,14 +127,15 @@ int main()
   //------------------------------------------------------------------------------------------//
 
   if(my_pe == 0)
-      std::cout << "\nsending "<< num_messages << " to all PEs with various message size using API: nvshmemx_int_get_warp\n";
+      std::cout << "\nsending "<< num_messages << " to all PEs with various message size using API: nvshmemx_int_put_warp\n";
   nvshmem_barrier_all();
 
   for(int i=0; i<7; i++)
   {
       int numBlock = 80;
-      int numThread = 512;
+      int numThread = 1024;
       cudaMallocManaged(&local_buffer, message_size[i]*numBlock*numThread/32);
+      totaltime = 0;
       for(int j=0; j<num_round; j++)
       {
           nvshmem_barrier_all();
@@ -155,7 +157,7 @@ int main()
   //------------------------------------------------------------------------------------------//
 
   if(my_pe == 0)
-      std::cout << "\nsending "<< num_messages << " to all PEs with various message size using API: nvshmemx_int_get_block\n";
+      std::cout << "\nsending "<< num_messages << " to all PEs with various message size using API: nvshmemx_int_put_block\n";
   nvshmem_barrier_all();
 
   for(int i=0; i<7; i++)
@@ -163,6 +165,7 @@ int main()
       int numBlock = 80;
       int numThread = 512;
       cudaMallocManaged(&local_buffer, message_size[i]*numBlock);
+      totaltime = 0.0;
       for(int j=0; j<num_round; j++)
       {
           nvshmem_barrier_all();
