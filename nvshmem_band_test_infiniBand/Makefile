@@ -58,7 +58,7 @@ endif
 .PHONY : default 
 default : examples
 
-EXAMPLECUSRCFILES := coalesced_put.cu
+EXAMPLECUSRCFILES := coalesced_put_type.cu coalesced_put_conf.cu coalesced_put_message_size.cu
 
 CUPERFBIN   := $(patsubst %.cu, %, $(filter %.cu, $(EXAMPLECUSRCFILES)))
 CXXPERFBIN  := $(patsubst %.cpp, %, $(filter %.cpp, $(PERFCXXSRCFILES)))

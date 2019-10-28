@@ -1,0 +1,13 @@
+#!/bin/bash
+# Begin LSF directives
+#BSUB -P BIF115
+#BSUB -J coalesced-put-conf
+#BSUB -o coalesced-put-conf.o%J
+#BSUB -e coalesced-put-conf.o%J
+#BSUB -W 00:05
+#BSUB -nnodes 2
+# End LSF directives and begin shell commands
+cd $LS_SUBCWD
+
+echo "jsrun -n 2 -r 1 -a 1 -c 40 -g 1 ./coalesced_put_conf"
+jsrun -n 2 -r 1 -a 1 -c 40 -g 1 ./coalesced_put_conf

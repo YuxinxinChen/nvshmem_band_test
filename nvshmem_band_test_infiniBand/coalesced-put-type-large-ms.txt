@@ -1,0 +1,58 @@
+jsrun -n 2 -r 1 -a 1 -c 40 -g 1 ./coalesced_put_type
+[1] has 1 GPUs, setDevice on GPU 0
+1 send 1073741824 bytes to 1 GPUs with message size(bytes) 1048576 using nvshmem_longlong_put using threads: 80x1024
+[0] has 1 GPUs, setDevice on GPU 0
+WARN: IB HCA and GPU are not connected to a PCIe switch so IB performance can be limited depending on the CPU generation 
+0 send 1073741824 bytes to 1 GPUs with message size(bytes) 1048576 using nvshmem_longlong_put using threads: 80x1024
+PE 0 average time: 136.873 bandwidth: 7.30606 GB/s
+PE 1 average time: 121.365 bandwidth: 8.23963 GB/s
+-----------------------------------------
+0 send 1073741824 bytes to 1 GPUs with message size(bytes) 1048576 using nvshmem_putmem using threads: 80x1024
+1 send 1073741824 bytes to 1 GPUs with message size(bytes) 1048576 using nvshmem_putmem using threads: 80x1024
+PE 1 average time: 121.135 bandwidth: 8.25527 GB/s
+PE 0 average time: 136.647 bandwidth: 7.31814 GB/s
+-----------------------------------------
+0 send 1073741824 bytes to 1 GPUs with message size(bytes) 1048576 using nvshmem_long_warp using threads: 80x1024
+1 send 1073741824 bytes to 1 GPUs with message size(bytes) 1048576 using nvshmem_long_warp using threads: 80x1024
+PE 0 average time: 136.879 bandwidth: 7.30573 GB/s
+PE 1 average time: 121.208 bandwidth: 8.25026 GB/s
+-----------------------------------------
+0 send 1073741824 bytes to 1 GPUs with message size(bytes) 1048576 using nvshmem_putmen_warp using threads: 80x1024
+1 send 1073741824 bytes to 1 GPUs with message size(bytes) 1048576 using nvshmem_putmen_warp using threads: 80x1024
+PE 1 average time: 120.702 bandwidth: 8.28486 GB/s
+PE 0 average time: 138.311 bandwidth: 7.23008 GB/s
+1 send 1073741824 bytes to 1 GPUs with message size(bytes) 1048576 using nvshmem_long_thread using threads: 80x1024
+-----------------------------------------
+0 send 1073741824 bytes to 1 GPUs with message size(bytes) 1048576 using nvshmem_long_thread using threads: 80x1024
+PE 1 average time: 121.191 bandwidth: 8.25147 GB/s
+PE 0 average time: 136.902 bandwidth: 7.30448 GB/s
+-----------------------------------------
+0 send 1073741824 bytes to 1 GPUs with message size(bytes) 1048576 using nvshmem_putmen_thread using threads: 80x1024
+1 send 1073741824 bytes to 1 GPUs with message size(bytes) 1048576 using nvshmem_putmen_thread using threads: 80x1024
+PE 0 average time: 136.892 bandwidth: 7.30505 GB/s
+PE 1 average time: 121.178 bandwidth: 8.25232 GB/s
+-----------------------------------------
+PE 0 calling from host side with nvshmemx_longlong_put_on_stream
+PE 1 calling from host side with nvshmemx_longlong_put_on_stream
+PE 0 average time: 136.656 bandwidth: 7.31764 GB/s
+PE 1 average time: 121.095 bandwidth: 8.25796 GB/s
+[1 of 2] run complete 
+-----------------------------------------
+[0 of 2] run complete 
+
+------------------------------------------------------------
+Sender: LSF System <lsfadmin@batch4>
+Subject: Job 707590: <coalesced-put-type> in cluster <summit> Done
+
+Job <coalesced-put-type> was submitted from host <login2> by user <yuxinc> in cluster <summit> at Sun Oct 27 20:17:08 2019
+Job was executed on host(s) <1*batch4>, in queue <batch>, as user <yuxinc> in cluster <summit> at Sun Oct 27 20:17:19 2019
+                            <42*h50n05>
+                            <42*h50n11>
+</ccs/home/yuxinc> was used as the home directory.
+</ccs/home/yuxinc/nvshmem_bw/nvshmem_band_test_infiniBand> was used as the working directory.
+Started at Sun Oct 27 20:17:19 2019
+Terminated at Sun Oct 27 20:17:44 2019
+Results reported at Sun Oct 27 20:17:44 2019
+
+The output (if any) is above this job summary.
+

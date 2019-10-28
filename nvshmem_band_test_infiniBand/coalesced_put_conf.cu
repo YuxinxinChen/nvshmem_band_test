@@ -60,24 +60,6 @@ __global__ void long_band_thread(int num_messages, int message_size, long long *
 	nvshmem_longlong_put(remote_buffer+message_size*i, local_buffer+message_size*i, message_size, remote_pe);
 }
 
-__global__ void char_band_block(int num_messages, int message_size, char *remote_buffer, char *local_buffer, int remote_pe)
-{
-    for(int i = blockIdx.x; i<num_messages; i+=gridDim.x)
-	nvshmemx_putmem_block(remote_buffer+message_size*i, local_buffer+message_size*i, message_size, remote_pe);
-}
-
-__global__ void char_band_warp(int num_messages, int message_size, char *remote_buffer, char *local_buffer, int remote_pe)
-{
-    for(int i = (TID >> 5); i<num_messages; i+=((blockDim.x*gridDim.x)>>5))
-	nvshmemx_putmem_warp(remote_buffer+message_size*i, local_buffer+message_size*i, message_size, remote_pe);
-}
-
-__global__ void char_band_thread(int num_messages, int message_size, char *remote_buffer, char *local_buffer, int remote_pe)
-{
-    for(int i = TID; i<num_messages; i+=blockDim.x*gridDim.x)
-	nvshmem_putmem((void *)(remote_buffer+message_size*i), (void *)(local_buffer+message_size*i), message_size, remote_pe);
-}
-
 int main (int c, char *v[])
 {
   int rank, nranks;
@@ -101,8 +83,7 @@ int main (int c, char *v[])
   printf("[%d] has %d GPUs, setDevice on GPU %d\n", mype, deviceCount, mype%deviceCount); 
   CUDA_CHECK(cudaSetDevice(mype%deviceCount));
 
-  int bytes = 1<<20;
-//  int bytes = 1<<30;
+  int bytes = 1<<30;
   char * remote_buffer = (char *)nvshmem_malloc(sizeof(char)*bytes);
   char * local_buffer;
   local_buffer = (char *)nvshmem_malloc(sizeof(char)*bytes);
@@ -110,7 +91,6 @@ int main (int c, char *v[])
   GpuTimer timer;
   float totaltime = 0.0;
   int message_bytes = 1024;
-//  int message_bytes = 1024*1024;
   int num_messages = bytes/message_bytes;
   cudaStream_t *streams;
   streams = (cudaStream_t *)malloc(sizeof(cudaStream_t)*(npes-1));
@@ -121,181 +101,168 @@ int main (int c, char *v[])
   int num_rounds = 20;
   CUDA_CHECK(cudaOccupancyMaxPotentialBlockSize(&numBlock, &numThread, (void *)long_band_block));
   nvshmem_barrier_all();
-  std::cout << mype << " send "<< bytes << " bytes to "<< npes-1 << " GPUs with message size(bytes) "<< message_bytes << " using nvshmem_longlong_put using threads: "<< numBlock << "x"<< numThread << std::endl;
+  std::cout << mype << " send "<< bytes << " bytes to "<< npes-1 << " GPUs with message size(bytes) "<< message_bytes << " using nvshmem_longlong_put_block using threads: "<< numBlock << "x"<< numThread << std::endl;
   nvshmem_barrier_all();
 
   for(int round = 0; round < num_rounds; round++)
-  {
-    int remote_pe = (mype+1)%npes;
-    timer.Start();
-    for(int j=0; j<npes-1; j++)
-    {
-       long_band_block<<<numBlock, numThread, 0, streams[j]>>>(num_messages, message_bytes/sizeof(long long), (long long *)remote_buffer, (long long *)local_buffer, remote_pe);
-       remote_pe = (remote_pe+1) % npes;
-    }
-    cudaDeviceSynchronize();
-    timer.Stop();
-    totaltime = totaltime + timer.ElapsedMillis();
-  }
-  nvshmem_barrier_all();
-  totaltime = totaltime/num_rounds;
-  std::cout << "PE "<<mype << " average time: " << totaltime << " bandwidth: "<<(bytes*(npes-1)/(totaltime/1000)/(1024*1024*1024))<<" GB/s"<<std::endl;
-  nvshmem_barrier_all();
-  if(mype == 0)
-     std::cout << "-----------------------------------------\n";
-
-  nvshmem_barrier_all();
-  totaltime = 0.0;
-  std::cout << mype << " send "<< bytes << " bytes to "<< npes-1 << " GPUs with message size(bytes) "<< message_bytes << " using nvshmem_putmem using threads: "<< numBlock << "x"<< numThread << std::endl;
-  nvshmem_barrier_all();
-
-  for(int round = 0; round < num_rounds; round++)
-  {
-    int remote_pe = (mype+1)%npes;
-    timer.Start();
-    for(int j=0; j<npes-1; j++)
-    {
-       char_band_block<<<numBlock, numThread, 0, streams[j]>>>(num_messages, message_bytes/sizeof(char), (char *)remote_buffer, (char *)local_buffer, remote_pe);
-       remote_pe = (remote_pe+1) % npes;
-    }
-    cudaDeviceSynchronize();
-    timer.Stop();
-    totaltime = totaltime + timer.ElapsedMillis();
-  }
-  nvshmem_barrier_all();
-  totaltime = totaltime/num_rounds;
-  std::cout << "PE "<<mype << " average time: " << totaltime << " bandwidth: "<<(bytes*(npes-1)/(totaltime/1000)/(1024*1024*1024))<<" GB/s"<<std::endl;
-  nvshmem_barrier_all();
-  if(mype == 0)
-     std::cout << "-----------------------------------------\n";
-
-  nvshmem_barrier_all();
-  totaltime = 0.0;
-  std::cout << mype << " send "<< bytes << " bytes to "<< npes-1 << " GPUs with message size(bytes) "<< message_bytes << " using nvshmem_long_warp using threads: "<< numBlock << "x"<< numThread << std::endl;
-  nvshmem_barrier_all();
-
-  for(int round = 0; round < num_rounds; round++)
-  {
-    int remote_pe = (mype+1)%npes;
-    timer.Start();
-    for(int j=0; j<npes-1; j++)
-    {
-       long_band_warp<<<numBlock, numThread, 0, streams[j]>>>(num_messages, message_bytes/sizeof(long long), (long long*)remote_buffer, (long long*)local_buffer, remote_pe);
-       remote_pe = (remote_pe+1) % npes;
-    }
-    cudaDeviceSynchronize();
-    timer.Stop();
-    totaltime = totaltime + timer.ElapsedMillis();
-  }
-  nvshmem_barrier_all();
-  totaltime = totaltime/num_rounds;
-  std::cout << "PE "<<mype << " average time: " << totaltime << " bandwidth: "<<(bytes*(npes-1)/(totaltime/1000)/(1024*1024*1024))<<" GB/s"<<std::endl;
-  nvshmem_barrier_all();
-  if(mype == 0)
-     std::cout << "-----------------------------------------\n";
-  nvshmem_barrier_all();
-
-  totaltime = 0.0;
-  std::cout << mype << " send "<< bytes << " bytes to "<< npes-1 << " GPUs with message size(bytes) "<< message_bytes << " using nvshmem_putmen_warp using threads: "<< numBlock << "x"<< numThread << std::endl;
-  nvshmem_barrier_all();
-
-  for(int round = 0; round < num_rounds; round++)
-  {
-    int remote_pe = (mype+1)%npes;
-    timer.Start();
-    for(int j=0; j<npes-1; j++)
-    {
-       char_band_warp<<<numBlock, numThread, 0, streams[j]>>>(num_messages, message_bytes/sizeof(char), (char *)remote_buffer, (char *)local_buffer, remote_pe);
-       remote_pe = (remote_pe+1) % npes;
-    }
-    cudaDeviceSynchronize();
-    timer.Stop();
-    totaltime = totaltime + timer.ElapsedMillis();
-  }
-  nvshmem_barrier_all();
-  totaltime = totaltime/num_rounds;
-  std::cout << "PE "<<mype << " average time: " << totaltime << " bandwidth: "<<(bytes*(npes-1)/(totaltime/1000)/(1024*1024*1024))<<" GB/s"<<std::endl;
-  nvshmem_barrier_all();
-  if(mype == 0)
-     std::cout << "-----------------------------------------\n";
-  nvshmem_barrier_all();
-
-  totaltime = 0.0;
-  std::cout << mype << " send "<< bytes << " bytes to "<< npes-1 << " GPUs with message size(bytes) "<< message_bytes << " using nvshmem_long_thread using threads: "<< numBlock << "x"<< numThread << std::endl;
-  nvshmem_barrier_all();
-
-  for(int round = 0; round < num_rounds; round++)
-  {
-    int remote_pe = (mype+1)%npes;
-    timer.Start();
-    for(int j=0; j<npes-1; j++)
-    {
-       long_band_thread<<<numBlock, numThread, 0, streams[j]>>>(num_messages, message_bytes/sizeof(long long), (long long*)remote_buffer, (long long*)local_buffer, remote_pe);
-       remote_pe = (remote_pe+1) % npes;
-    }
-    cudaDeviceSynchronize();
-    timer.Stop();
-    totaltime = totaltime + timer.ElapsedMillis();
-  }
-  nvshmem_barrier_all();
-  totaltime = totaltime/num_rounds;
-  std::cout << "PE "<<mype << " average time: " << totaltime << " bandwidth: "<<(bytes*(npes-1)/(totaltime/1000)/(1024*1024*1024))<<" GB/s"<<std::endl;
-  nvshmem_barrier_all();
-  if(mype == 0)
-     std::cout << "-----------------------------------------\n";
-  nvshmem_barrier_all();
-
-  totaltime = 0.0;
-  std::cout << mype << " send "<< bytes << " bytes to "<< npes-1 << " GPUs with message size(bytes) "<< message_bytes << " using nvshmem_putmen_thread using threads: "<< numBlock << "x"<< numThread << std::endl;
-  nvshmem_barrier_all();
-
-  for(int round = 0; round < num_rounds; round++)
-  {
-    int remote_pe = (mype+1)%npes;
-    timer.Start();
-    for(int j=0; j<npes-1; j++)
-    {
-       char_band_thread<<<numBlock, numThread, 0, streams[j]>>>(num_messages, message_bytes/sizeof(char), (char *)remote_buffer, (char *)local_buffer, remote_pe);
-       remote_pe = (remote_pe+1) % npes;
-    }
-    cudaDeviceSynchronize();
-    timer.Stop();
-    totaltime = totaltime + timer.ElapsedMillis();
-  }
-  nvshmem_barrier_all();
-  totaltime = totaltime/num_rounds;
-  std::cout << "PE "<<mype << " average time: " << totaltime << " bandwidth: "<<(bytes*(npes-1)/(totaltime/1000)/(1024*1024*1024))<<" GB/s"<<std::endl;
-  nvshmem_barrier_all();
-  if(mype == 0)
-     std::cout << "-----------------------------------------\n";
-  nvshmem_barrier_all();
-
-
-  std::cout << "PE "<<mype << " calling from host side with nvshmemx_longlong_put_on_stream" << std::endl;
-  totaltime = 0;
-  for(int round = 0; round <  num_rounds; round++)
   {
      int remote_pe = (mype+1)%npes;
-     timer.Start();
      for(int j=0; j<npes-1; j++)
      {
-	nvshmemx_longlong_put_on_stream((long long *)remote_buffer, (long long *)local_buffer, bytes/sizeof(long long), remote_pe, streams[j]);	
-	remote_pe = (remote_pe+1)%npes;
+        timer.Start();
+        long_band_block<<<numBlock, numThread, 0, streams[0]>>>(num_messages, message_bytes/sizeof(long long), (long long *)remote_buffer, (long long *)local_buffer, remote_pe);
+        remote_pe = (remote_pe+1) % npes;
      }
      cudaDeviceSynchronize();
      timer.Stop();
-     totaltime = totaltime +  timer.ElapsedMillis();
+     totaltime = totaltime + timer.ElapsedMillis();
   }
-  nvshmem_barrier_all(); 
+  nvshmem_barrier_all();
   totaltime = totaltime/num_rounds;
   std::cout << "PE "<<mype << " average time: " << totaltime << " bandwidth: "<<(bytes*(npes-1)/(totaltime/1000)/(1024*1024*1024))<<" GB/s"<<std::endl;
   nvshmem_barrier_all();
   if(mype == 0)
-     std::cout << "-----------------------------------------\n";
+    std::cout << "-------------------------------\n";
+  nvshmem_barrier_all();
+  
+  totaltime = 0.0;
+  numBlock = numBlock*32;
+  numThread = numThread/32;
+  std::cout << mype << " send "<< bytes << " bytes to "<< npes-1 << " GPUs with message size(bytes) "<< message_bytes << " using nvshmem_longlong_put_block using threads: "<< numBlock << "x"<< numThread << std::endl;
+  nvshmem_barrier_all();
+
+  for(int round = 0; round < num_rounds; round++)
+  {
+     int remote_pe = (mype+1)%npes;
+     for(int j=0; j<npes-1; j++)
+     {
+        timer.Start();
+        long_band_block<<<numBlock, numThread, 0, streams[0]>>>(num_messages, message_bytes/sizeof(long long), (long long *)remote_buffer, (long long *)local_buffer, remote_pe);
+        remote_pe = (remote_pe+1) % npes;
+     }
+     cudaDeviceSynchronize();
+     timer.Stop();
+     totaltime = totaltime + timer.ElapsedMillis();
+  }
+  nvshmem_barrier_all();
+  totaltime = totaltime/num_rounds;
+  std::cout << "PE "<<mype << " average time: " << totaltime << " bandwidth: "<<(bytes*(npes-1)/(totaltime/1000)/(1024*1024*1024))<<" GB/s"<<std::endl;
+  nvshmem_barrier_all();
+  if(mype == 0)
+    std::cout << "-------------------------------\n";
+  nvshmem_barrier_all();
+ 
+  CUDA_CHECK(cudaOccupancyMaxPotentialBlockSize(&numBlock, &numThread, (void *)long_band_warp));
+  totaltime = 0.0;
+  nvshmem_barrier_all();
+  std::cout << mype << " send "<< bytes << " bytes to "<< npes-1 << " GPUs with message size(bytes) "<< message_bytes << " using nvshmem_longlong_put_warp using threads: "<< numBlock << "x"<< numThread << std::endl;
+  nvshmem_barrier_all();
+
+  for(int round = 0; round < num_rounds; round++)
+  {
+     int remote_pe = (mype+1)%npes;
+     for(int j=0; j<npes-1; j++)
+     {
+        timer.Start();
+        long_band_warp<<<numBlock, numThread, 0, streams[0]>>>(num_messages, message_bytes/sizeof(long long), (long long *)remote_buffer, (long long *)local_buffer, remote_pe);
+        remote_pe = (remote_pe+1) % npes;
+     }
+     cudaDeviceSynchronize();
+     timer.Stop();
+     totaltime = totaltime + timer.ElapsedMillis();
+  }
+  nvshmem_barrier_all();
+  totaltime = totaltime/num_rounds;
+  std::cout << "PE "<<mype << " average time: " << totaltime << " bandwidth: "<<(bytes*(npes-1)/(totaltime/1000)/(1024*1024*1024))<<" GB/s"<<std::endl;
+  nvshmem_barrier_all();
+  if(mype == 0)
+    std::cout << "-------------------------------\n";
+  nvshmem_barrier_all();
+  
+  totaltime = 0.0;
+  numBlock = numBlock*32;
+  numThread = numThread/32;
+  std::cout << mype << " send "<< bytes << " bytes to "<< npes-1 << " GPUs with message size(bytes) "<< message_bytes << " using nvshmem_longlong_put_warp using threads: "<< numBlock << "x"<< numThread << std::endl;
+  nvshmem_barrier_all();
+
+  for(int round = 0; round < num_rounds; round++)
+  {
+     int remote_pe = (mype+1)%npes;
+     for(int j=0; j<npes-1; j++)
+     {
+        timer.Start();
+        long_band_warp<<<numBlock, numThread, 0, streams[0]>>>(num_messages, message_bytes/sizeof(long long), (long long *)remote_buffer, (long long *)local_buffer, remote_pe);
+        remote_pe = (remote_pe+1) % npes;
+     }
+     cudaDeviceSynchronize();
+     timer.Stop();
+     totaltime = totaltime + timer.ElapsedMillis();
+  }
+  nvshmem_barrier_all();
+  totaltime = totaltime/num_rounds;
+  std::cout << "PE "<<mype << " average time: " << totaltime << " bandwidth: "<<(bytes*(npes-1)/(totaltime/1000)/(1024*1024*1024))<<" GB/s"<<std::endl;
+  nvshmem_barrier_all();
+  if(mype == 0)
+    std::cout << "-------------------------------\n";
+  nvshmem_barrier_all();
+
+  CUDA_CHECK(cudaOccupancyMaxPotentialBlockSize(&numBlock, &numThread, (void *)long_band_thread));
+  totaltime = 0.0;
+  nvshmem_barrier_all();
+  std::cout << mype << " send "<< bytes << " bytes to "<< npes-1 << " GPUs with message size(bytes) "<< message_bytes << " using nvshmem_longlong_put_thread using threads: "<< numBlock << "x"<< numThread << std::endl;
+  nvshmem_barrier_all();
+
+  for(int round = 0; round < num_rounds; round++)
+  {
+     int remote_pe = (mype+1)%npes;
+     for(int j=0; j<npes-1; j++)
+     {
+        timer.Start();
+        long_band_thread<<<numBlock, numThread, 0, streams[0]>>>(num_messages, message_bytes/sizeof(long long), (long long *)remote_buffer, (long long *)local_buffer, remote_pe);
+        remote_pe = (remote_pe+1) % npes;
+     }
+     cudaDeviceSynchronize();
+     timer.Stop();
+     totaltime = totaltime + timer.ElapsedMillis();
+  }
+  nvshmem_barrier_all();
+  totaltime = totaltime/num_rounds;
+  std::cout << "PE "<<mype << " average time: " << totaltime << " bandwidth: "<<(bytes*(npes-1)/(totaltime/1000)/(1024*1024*1024))<<" GB/s"<<std::endl;
+  nvshmem_barrier_all();
+  if(mype == 0)
+    std::cout << "-------------------------------\n";
+  nvshmem_barrier_all();
+  
+  totaltime = 0.0;
+  numBlock = numBlock*32;
+  numThread = numThread/32;
+  std::cout << mype << " send "<< bytes << " bytes to "<< npes-1 << " GPUs with message size(bytes) "<< message_bytes << " using nvshmem_longlong_put_thread using threads: "<< numBlock << "x"<< numThread << std::endl;
+  nvshmem_barrier_all();
+
+  for(int round = 0; round < num_rounds; round++)
+  {
+     int remote_pe = (mype+1)%npes;
+     for(int j=0; j<npes-1; j++)
+     {
+        timer.Start();
+        long_band_thread<<<numBlock, numThread, 0, streams[0]>>>(num_messages, message_bytes/sizeof(long long), (long long *)remote_buffer, (long long *)local_buffer, remote_pe);
+        remote_pe = (remote_pe+1) % npes;
+     }
+     cudaDeviceSynchronize();
+     timer.Stop();
+     totaltime = totaltime + timer.ElapsedMillis();
+  }
+  nvshmem_barrier_all();
+  totaltime = totaltime/num_rounds;
+  std::cout << "PE "<<mype << " average time: " << totaltime << " bandwidth: "<<(bytes*(npes-1)/(totaltime/1000)/(1024*1024*1024))<<" GB/s"<<std::endl;
+  nvshmem_barrier_all();
+  if(mype == 0)
+    std::cout << "-------------------------------\n";
+  nvshmem_barrier_all();
 
   nvshmem_barrier_all();
   printf("[%d of %d] run complete \n", mype, npes);
-
+ 
   nvshmem_free(remote_buffer);
   nvshmem_free(local_buffer);
 
